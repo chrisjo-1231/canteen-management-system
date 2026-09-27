@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  CASHIER
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  sales  Sale[]
+}
+
+model Category {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  foods Food[]
+}
+
+model InventoryLog {
+  id        Int              @id @default(autoincrement())
+  foodId    Int
+  type      InventoryLogType
+  quantity  Int
+  reason    String?
+  createdAt DateTime         @default(now())
+
+  food Food @relation(fields: [foodId], references: [id], onDelete: Cascade)
+}
+
+enum InventoryLogType {
+  STOCK_IN
+  STOCK_OUT
+}
+
+model Food {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  image       String?
+  stock       Int      @default(0)
+  isAvailable Boolean  @default(true)
+  categoryId  Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category      Category       @relation(fields: [categoryId], references: [id])
+  orderItems    OrderItem[]
+  dailyMenus    DailyMenu[]
+  saleItems     SaleItem[]
+  inventoryLogs InventoryLog[]
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  userId    Int
+  total     Decimal     @db.Decimal(10, 2)
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+
+  user    User        @relation(fields: [userId], references: [id])
+  items   OrderItem[]
+  payment Payment?
+}
+
+model OrderItem {
+  id       Int     @id @default(autoincrement())
+  orderId  Int
+  foodId   Int
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+
+  order Order @relation(fields: [orderId], references: [id])
+  food  Food  @relation(fields: [foodId], references: [id])
+}
+
+model Payment {
+  id        Int           @id @default(autoincrement())
+  orderId   Int           @unique
+  amount    Decimal       @db.Decimal(10, 2)
+  method    PaymentMethod
+  status    PaymentStatus @default(PENDING)
+  reference String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model DailyMenu {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  foodId    Int
+  createdAt DateTime @default(now())
+
+  food Food @relation(fields: [foodId], references: [id], onDelete: Cascade)
+
+  @@unique([date, foodId])
+}
+
+model Sale {
+  id           Int      @id @default(autoincrement())
+  cashierId    Int
+  total        Decimal  @db.Decimal(10, 2)
+  cashReceived Decimal  @db.Decimal(10, 2)
+  change       Decimal  @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+
+  cashier User       @relation(fields: [cashierId], references: [id])
+  items   SaleItem[]
+}
+
+model SaleItem {
+  id       Int     @id @default(autoincrement())
+  saleId   Int
+  foodId   Int
+  quantity Int
+  price    Decimal @db.Decimal(10, 2)
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  food Food @relation(fields: [foodId], references: [id])
+}
+
+enum PaymentMethod {
+  CASH
+  GCASH
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
